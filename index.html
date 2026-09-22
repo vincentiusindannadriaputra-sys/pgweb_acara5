@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Leaflet JS</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <style>
+        html,
+        body,
+        #map {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+    </style>
+</head>
+
+<body>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        // Inisialisasi peta
+        var map = L.map("map").setView([-8.231635977695753, 122.86588340006523], 11);
+
+        // Tile layer basemap
+        var basemap = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        }).addTo(map);
+
+        // GeoJSON polygon jumlah penduduk
+        var jumlahPenduduk = L.geoJSON(null, {
+
+            // Style
+            style: function (feature) {
+                var val = feature.properties.Penduduk || feature.properties.jumlah_penduduk || 0;
+
+                if (val <= 12000) {
+                    return {
+                        opacity: 1,
+                        color: 'black',
+                        weight: 1.0,
+                        fillOpacity: 0.7,
+                        fillColor: '#ffffb2'
+                    };
+                }
+                if (val > 12000 && val <= 24000) {
+                    return {
+                        opacity: 1,
+                        color: 'black',
+                        weight: 1.0,
+                        fillOpacity: 0.7,
+                        fillColor: '#fd8d3c'
+                    };
+                }
+                if (val > 24000) {
+                    return {
+                        opacity: 1,
+                        color: 'black',
+                        weight: 1.0,
+                        fillOpacity: 0.7,
+                        fillColor: '#bd0026'
+                    };
+                }
+            },
+
+            // Each feature
+            onEachFeature: function (feature, layer) {
+                var kecamatan = feature.properties.WADMKC || feature.properties.kecamatan || "Tidak Diketahui";
+                var penduduk = feature.properties.Penduduk || feature.properties.jumlah_penduduk || 0;
+
+                // Popup
+                var popup_content = "<b>Kecamatan:</b> " + kecamatan + "<br>" +
+                    "<b>Jumlah Penduduk:</b> " + penduduk.toLocaleString("id-ID") + " Jiwa";
+                layer.bindPopup(popup_content);
+
+                // Tooltip
+                layer.bindTooltip("Kec. " + kecamatan, { direction: "center", sticky: true });
+            }
+        });
+
+        // GeoJSON Polyline Jalan
+        var jalan = L.geoJSON(null, {
+
+            // Style
+            style: function (feature) {
+                return {
+                    color: "#e67e22",
+                    weight: 3,
+                    opacity: 0.9
+                };
+            },
+
+            // Each feature
+            onEachFeature: function (feature, layer) {
+                var namaJalan = feature.properties.NAMA_UNSUR || feature.properties.NAMOBJ || "Jalan Tanpa Nama";
+                var panjang = feature.properties.Panjang_KM ? feature.properties.Panjang_KM + " km" : "-";
+
+                // Popup
+                var popup_content = "<b>Nama Jalan:</b> " + namaJalan + "<br>" +
+                    "<b>Panjang:</b> " + panjang;
+                layer.bindPopup(popup_content);
+
+                // Tooltip
+                layer.bindTooltip(namaJalan, { direction: "auto", sticky: true });
+            }
+        });
+
+        // GeoJSON point toponimi
+        var Toponimi = L.geoJSON(null, {
+
+            // Style
+            pointToLayer: function (feature, latlng) {
+                return L.marker(latlng, {
+                    icon: L.icon({
+                        iconUrl: "images/home_marker.png",
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 32],
+                        popupAnchor: [0, -32],
+                        tooltipAnchor: [10, -20],
+                    }),
+                });
+            },
+
+            // Each feature
+            onEachFeature: function (feature, layer) {
+                var nama = feature.properties.TOPONIMI || feature.properties.NAMOBJ || "Tanpa Nama";
+                var img = feature.properties.image ? "<br><img src='images/" + feature.properties.image + "' width='200'>" : "";
+
+                // Popup
+                var popup_content = "<b>Nama:</b> " + nama + "<br>" +
+                    "<b>Koordinat:</b> " + feature.geometry.coordinates[1].toFixed(5) + ", " + feature.geometry.coordinates[0].toFixed(5) + img;
+                layer.bindPopup(popup_content);
+
+                // Tooltip
+                layer.bindTooltip(nama, { direction: "top", sticky: true });
+            }
+        });
+
+        // Mengurutkan layer
+        $.getJSON("GeoJSON/Jumlah_Penduduk.geojson", function (data) {
+            jumlahPenduduk.addData(data);
+            jumlahPenduduk.addTo(map);
+
+            $.getJSON("GeoJSON/Jalan.geojson", function (data) {
+                jalan.addData(data);
+                jalan.addTo(map);
+
+                $.getJSON("GeoJSON/Toponimi.geojson", function (data) {
+                    Toponimi.addData(data);
+                    Toponimi.addTo(map);
+                });
+            });
+        });
+
+        // Kontrol layer
+        var overlayMaps = {
+            "Toponimi": Toponimi,
+            "Jaringan Jalan": jalan,
+            "Jumlah Penduduk": jumlahPenduduk
+        };
+
+        L.control.layers(null, overlayMaps, { collapsed: false }).addTo(map);
+    </script>
+</body>
+
+</html>
